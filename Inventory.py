@@ -14,7 +14,8 @@
 import requests
 import json
 import getCookie
-import csv
+import time
+from termcolor import colored
 from datetime import date
 from PowerSupplyUnitClass import PowerSupplyUnitsClass
 from LinesCardModule import LinesCardModule
@@ -99,6 +100,9 @@ class Inventory:
 	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
 	    json_obj = json.loads(responds.content)
 	    return json_obj
+
+    def printAux(self):
+        print("+----------------------------------------------------------------------+")
 
     #Export ACI Inventory in CSV Format
     def ExportInventoryCsvFormat(self):
@@ -230,8 +234,16 @@ class Inventory:
     #Export ACI Inventory in JSON Format
     def ExportInventoryJsonFormat(self):
 
+        #Print the Information collected by the APICs
+        self.printAux()     
+        print("|                      Retriving data from APIC                        |")
+        self.printAux()
+
         #URL to obtain the Fabric Name
         URL = "https://%s/api/node/mo/topology/pod-1/node-1.json?query-target=children&target-subtree-class=infraCont" % self.__Constant.apic
+
+        #Print The process of the Fabric Name
+        print("|     Retriving Fabric Name: ", end = "\r")
 
         #Variable that store all the FANs information in JSON format
         FABRIC_NAME = self.__get_request(URL)
@@ -257,11 +269,31 @@ class Inventory:
                         }
                     }
         
+        #Print The process of the Fabric Name
+        print("|     Retriving Fabric Name: Complete                                  |")
+
         #Fabric List Based on number of nodes
         Fabric_Json['data']['Chassis'] = []
 
+        #Print The Numbers of Fabrics Nodes in the Fabric
+        print("|     Number of Fabric Nodes: %s                                       |" % len(self.__Node_ID_List))
+
+        #Start Retrieving data
+        self.printAux()
+
         #We create all the Chassis information into the Json variable
         for i in range ( 0, len(self.__Node_ID_List )):
+
+            #Variable for frame Size, in our Script value 72
+            FrameSize = len("|                      Retriving data from APIC                        |")
+
+            #Loading frame size
+            LoadingDataFrameSize = len("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Loading', 'red')))
+
+            #Retreving data from Fabrics Nodes 
+            print("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Loading', 'red')), '     ' ,' ' * (FrameSize - LoadingDataFrameSize), "|" , end="\r") 
+            time.sleep(1)
+
             Chassis = {
                     'Node ID'       :   self.__Node_ID_List[i],
                     'description' : self.__Chassis_List[i].getDescription(),
@@ -279,6 +311,13 @@ class Inventory:
             Fabric_Json['data']['Chassis'][i]['Supervisor'] = []
             Fabric_Json['data']['Chassis'][i]['Power Supply'] = []
             Fabric_Json['data']['Chassis'][i]['Line Card'] = []
+
+            #Procesing frame size
+            ProcessingDataFrameSize = len("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Processing', 'yellow')))
+
+            #Start procesing Data
+            print("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Processing', 'yellow')), '     ' ,' ' * (FrameSize - ProcessingDataFrameSize), "|", end="\r")
+            time.sleep(1)
 
             #If the Node is not a APIC we detect the Supervisor, Power Supply and Lines cards information
             if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
@@ -325,13 +364,33 @@ class Inventory:
                         'UP_Time' : self.__LineCards_List[i].getUpTime(k),
                     }
                     Fabric_Json['data']['Chassis'][i]['Line Card'].append(LineCard)
+            
+            #Process completed from Node i
+            print("|     Retreving data from %s: %s  " %(str(self.__Node_ID_List[i]), colored('Complete', 'green')))
+            time.sleep(1)
 
         #We use the Date Class in order to know when the Output File was created
         today = date.today()
         
         #We create the Filename based on the APIC name and Date
         Filename =  "Inventory" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".json"
-        
+
+        #Print Last 
+        self.printAux()
+
+        #Generating JSON File name Size
+        GenJsonFileSize = len("|     Generating JSON File: %s" % colored('Complete', 'green'))
+
+        #Filename Size
+        FilenameJsonFileSize = len("|     File Name: %s" %(Filename))
+
+        #Print JSON File Name
+        print("|     Generating JSON File: %s" % colored('Complete', 'green'), '     ' ,' ' * (FrameSize - GenJsonFileSize), "|")
+        print("|     File Name: %s" % colored(Filename, 'green'),' ' * (FrameSize - FilenameJsonFileSize - 3), "|")
+
+        #Print Last 
+        self.printAux()
+
         #We create the JSON File
         #If the File exist we override the file
         try:
