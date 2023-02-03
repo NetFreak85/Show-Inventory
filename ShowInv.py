@@ -22,13 +22,9 @@ from Inventory import Inventory
 
 #Main program
 if __name__ == '__main__':
+
+    #Generating Inventory variable
     Inventory = Inventory(Constant)
-    
-    #Export Cisco ACI Inventory via Command Line Interface
-    #Inventory.printInventory()
 
     #Export Cisco ACI Inventory via JSON file
     Inventory.ExportInventoryJsonFormat()
-
-    #Export Cisco ACI Inventory via CSV File
-    #Inventory.ExportInventoryCsvFormat()

@@ -16,10 +16,11 @@ from LineCard import LineCard
 
 class LinesCardModule:
 
-    def __init__(self, ACI_IP, ACI_Cookie, Node_ID):
+    def __init__(self, ACI_IP, ACI_Cookie, Node_ID, Linecard_URL):
         self.__ACI_IP_ADDR = ACI_IP
         self.__ACI_Cookie = ACI_Cookie
         self.__Node_ID = Node_ID
+        self.__URL = Linecard_URL
         self.__LineCard_List = []
         self.__getLineCardModuleInfo()
 
@@ -36,6 +37,9 @@ class LinesCardModule:
     #ACI Node ID
     __Node_ID = ""
 
+    #URL that will query for the Linecards information from Cisco APIC
+    __URL = ""
+
     #List that will store all LineCards Info in Objects
     __LineCard_List = []
 
@@ -43,11 +47,11 @@ class LinesCardModule:
     # Get Methods #
     ###############
 
-    #Get the Fan List
+    #Get the Linecard List
     def getLineCardList(self):
         return self.__LineCard_List
     
-    #Return Number of Fan Lists
+    #Return Number of Linecard Lists
     def getNumLineCardList(self):
         return len(self.__LineCard_List)
 
@@ -96,20 +100,18 @@ class LinesCardModule:
     ##########################################################
     
     def __get_request(self, url):
-	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
-	    json_obj = json.loads(responds.content)
-	    return json_obj
+        responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
+        json_obj = json.loads(responds.content)
+        return json_obj
     
     ######################################
     # Get Line Module Units Information  #
     ######################################
 
     def __getLineCardModuleInfo(self):
-        #URL that will provide all the information about the FANs
-        URL = "https://%s/api/node/mo/topology/pod-1/node-%s.json?query-target=subtree&target-subtree-class=eqptLC" % (self.__ACI_IP_ADDR, self.__Node_ID)
- 
-        #Variable that store all the FANs information in JSON format
-        LineCardJson = self.__get_request(URL)
+
+        #Variable that store all the Line Cards information in JSON format
+        LineCardJson = self.__get_request(self.__URL % (self.__ACI_IP_ADDR, self.__Node_ID))
 
         for i in range(0,int(LineCardJson['totalCount'])):
             #Description, Hardware_Version, Model, Operational_Status, Power_Status, Serial_Number, Vendor, UP_Time):

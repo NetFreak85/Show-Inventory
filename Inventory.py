@@ -11,16 +11,21 @@
 # Import Section #
 ##################
 
+from ast import Constant
 import requests
 import json
 import getCookie
-import time
+import yaml
+import argparse
+
 from termcolor import colored
 from datetime import date
 from PowerSupplyUnitClass import PowerSupplyUnitsClass
 from LinesCardModule import LinesCardModule
 from SupervisorClass import SupervisorClass
 from ChassisClass import ChassisClass
+from SystemControllerModule import SystemControllerModule
+from FabricModuleControllers import FabricModuleControllers
 
 #################
 #Class Definition
@@ -34,13 +39,22 @@ class Inventory:
         self.__Chassis_List = []
         self.__LineCards_List = []
         self.__PowerSupply_List = []
+        self.__SystemController_List = []
+        self.__FabricModule_List = []
         self.__ACI_Cookie = ""
         self.__Chassis_Query = ""
         self.__Supervisor_Query = ""
         self.__LineCards_Query = ""
         self.__PowerSupply_Query = ""
+        self.__SystemController_Query = ""
+        self.__FabricModule_Query = ""
+        self.__URLs = ""
+        self.__args = self.__get_args()
+        self.__FabricName = ""
+        self.__Read_Yaml_File()
         self.__Query_Generator()
         self.__Fabric_Nodes()
+
 
     #########################
     # Attributes Definition #
@@ -48,6 +62,15 @@ class Inventory:
 
     #Constat Variable ( ACI IP Address and User/Password )
     __Constant = ""
+
+    #Variable that will store all the URL required by retrieve information from Cisco APIC
+    __URLs = ""
+
+    #Class that evaluate arguments in the script
+    __args = ""
+
+    #Variable that store the Fabric name
+    __FabricName = ""
 
     #Node IDs List
     __Node_ID_List = []
@@ -64,6 +87,12 @@ class Inventory:
     #Power Supplys Lists
     __PowerSupply_List = []
 
+    #System Controllers List
+    __SystemController_List = []
+
+    #Fabric Module List
+    __FabricModule_List = []
+
     ####################################
     # Cookie Variables for APIC Querys #
     ####################################
@@ -71,185 +100,95 @@ class Inventory:
     #Cookie for all Fabric Node Querys
     __ACI_Cookie = ""
 
-    #Cookie for all Chassis Query
+    #Cookie for all Chassis Querys
     __Chassis_Query = ""
 
     #Cookie for all Supervisor Querys
     __Supervisor_Query = ""
 
-    #Cookie for all Line Cards Query
+    #Cookie for all Line Cards Querys
     __LineCards_Query = ""
 
-    #Cookie for all Power Supplys Query
+    #Cookie for all Power Supplys Querys
     __PowerSupply_Query = ""
+
+    #Cookie for all the System Controller Querys
+    __SystemController_Query = ""
+
+    #Cookie for all the Fabric Module Querys
+    __FabricModule_Query = ""
 
     ##########################
     # Get Methods definition #
     ##########################
 
+    #Defining the Argument function that allow the verbose mode
+    def __get_args(self):
+        parser = argparse.ArgumentParser()
+
+        #Method that enable verbose mode
+        parser.add_argument('-v',
+                        help='Verbose mode',
+                        action='store_true',
+                        required=False)
+
+        return parser.parse_args()
+
     #Method that get the Querys
     def __Query_Generator(self):
-        self.__ACI_Cookie        =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password)
-        self.__Chassis_Query     =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password)
-        self.__Supervisor_Query  =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password)
-        self.__LineCards_Query   =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password)
-        self.__PowerSupply_Query =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password)
+        self.__ACI_Cookie        =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__Chassis_Query     =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__Supervisor_Query  =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__LineCards_Query   =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__PowerSupply_Query =  getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__SystemController_Query = getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+        self.__FabricModule_Query = getCookie.get_cookie(self.__Constant.apic, self.__Constant.User, self.__Constant.Password, self.__URLs['URLs']['Token'])
+
+    #Function that read the Cisco ACI URL for RESCONF querys in YAML file
+    def __Read_Yaml_File(self):
+        with open('url.yaml') as file:
+            try:
+                self.__URLs = yaml.safe_load(file)
+            except yaml.YAMLError as exc:
+                exit(print("Error reading from URL.YAML file"))
 
     #Check the numbers of Nodes and return a JSON variable
     def __get_request(self, url):
-	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
-	    json_obj = json.loads(responds.content)
-	    return json_obj
+        responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
+        json_obj = json.loads(responds.content)
+        return json_obj
+
+    #Method that print the process evolution
+    def __print_Node_Info(self, method,node, node_type, FrameSize, bool, color):
+
+        #Check the length of the string
+        strig_len = len("|     %s data from %s %s: %s" % (method, node_type, str(node), method))
+
+        #True if the options are Retrieve or Loading
+        #False if the option is Completed
+        #Those are differents because the last one don't override the line output
+        if bool:
+            print("|     %s data from %s %s: %s" % (colored(method, color), colored(str(node_type).upper(), color), str(node), colored(method, color))+ ' ' * ((FrameSize - strig_len) - 2), "|", end="\r")
+        else:
+            print("|     %s data from %s %s: %s" % (colored(method, color), colored(str(node_type).upper(), color), str(node), colored(method, color))+ ' ' * ((FrameSize - strig_len) - 2), "|")
 
     def printAux(self):
         print("+----------------------------------------------------------------------+")
 
-    #Export ACI Inventory in CSV Format
-    def ExportInventoryCsvFormat(self):
-
-        #URL to obtain the Fabric Name
-        URL = "https://%s/api/node/mo/topology/pod-1/node-1.json?query-target=children&target-subtree-class=infraCont" % self.__Constant.apic
-
-        #Variable that store all the FANs information in JSON format
-        FABRIC_NAME = self.__get_request(URL)
-
-        #We use the Date Class in order to know when the Output File was created
-        today = date.today()
-        
-        #Filename based on Component, Fabric name and Date
-        CHASSIS_Filename =  "Inventory-Chassis" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".csv"
-        SUPERVISOR_Filename = "Inventory-Supervisor" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".csv"
-        POWER_SUPPLY_Filename = "Inventory-PowerSupply" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".csv"
-        LINE_CARD_Filename = "Inventory-LineCard" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".csv"
-
-        #We create the CSV Chassis File
-        #If the File exist we override the file
-        try:
-            ChassisFile = open( CHASSIS_Filename , "x" )
-            ChassisFile.write("Component, Node ID, description, Model, OperationalStatus, Role, SerialNumber, Status, Vendor")
-            ChassisFile.write("\n")
-
-            for index in range ( 0, int(len(self.__Node_ID_List ))):
-                if int(self.__Node_ID_List[index]) > int(self.__Constant.APIC_Number):
-                    ChassisFile.write("Chassis, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[index], self.__Chassis_List[index].getDescription() ,self.__Chassis_List[index].getModel() ,self.__Chassis_List[index].getOperationalStatus() ,self.__Chassis_List[index].getRole() ,self.__Chassis_List[index].getSerialNumber() ,self.__Chassis_List[index].getStatus() ,self.__Chassis_List[index].getVendor()))
-                else:
-                    ChassisFile.write("Chassis, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[index], self.__Chassis_List[index].getDescription() ,self.__Chassis_List[index].getModel() ,self.__Chassis_List[index].getOperationalStatus() ,"APIC" ,self.__Chassis_List[index].getSerialNumber() ,self.__Chassis_List[index].getStatus() ,self.__Chassis_List[index].getVendor()))
-                ChassisFile.write("\n")
-            ChassisFile.close()
-        except:
-            ChassisFile = open( CHASSIS_Filename , "w" )
-            ChassisFile.write("Component, Node ID, description, Model, OperationalStatus, Role, SerialNumber, Status, Vendor")
-            ChassisFile.write("\n")
-
-            for index in range ( 0, int(len(self.__Node_ID_List ))):
-                if int(self.__Node_ID_List[index]) > int(self.__Constant.APIC_Number):
-                    ChassisFile.write("Chassis, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[index], self.__Chassis_List[index].getDescription() ,self.__Chassis_List[index].getModel() ,self.__Chassis_List[index].getOperationalStatus() ,self.__Chassis_List[index].getRole() ,self.__Chassis_List[index].getSerialNumber() ,self.__Chassis_List[index].getStatus() ,self.__Chassis_List[index].getVendor()))
-                else:
-                    ChassisFile.write("Chassis, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[index], self.__Chassis_List[index].getDescription() ,self.__Chassis_List[index].getModel() ,self.__Chassis_List[index].getOperationalStatus() ,"APIC" ,self.__Chassis_List[index].getSerialNumber() ,self.__Chassis_List[index].getStatus() ,self.__Chassis_List[index].getVendor()))
-                ChassisFile.write("\n")
-
-            ChassisFile.close()
-
-        #We create the CSV Supervisor File
-        #If the File exist we override the file 
-        try:
-            SupervisorFile = open( SUPERVISOR_Filename , "x" )
-            SupervisorFile.write("Component, Node ID, Supervisor ID, Description, Operational Status, Power Status, Serial Number, Vendor, Model, Hardware Version, Uptime")
-            SupervisorFile.write("\n")
-
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > int(self.__Constant.APIC_Number):
-                    for k in range (0 , len( self.__Supervisor_List[i].getSupervisorList())): 
-                        SupervisorFile.write("Supervisor, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__Supervisor_List[i].getSupervisor_ID(k), self.__Supervisor_List[i].getDescription(k), self.__Supervisor_List[i].getOperational_Status(k), self.__Supervisor_List[i].getPowerStatus(k), self.__Supervisor_List[i].getSerial_Number(k), self.__Supervisor_List[i].getVendor(k), self.__Supervisor_List[i].getModel(k), self.__Supervisor_List[i].getHardwareVersion(k), self.__Supervisor_List[i].getUpTime(k)))
-                        SupervisorFile.write("\n")
-            
-            SupervisorFile.close()
-        except:
-            SupervisorFile = open( SUPERVISOR_Filename , "w" )
-            SupervisorFile.write("Component, Node ID, Supervisor ID, Description, Operational Status, Power Status, Serial Number, Vendor, Model, Hardware Version, Uptime")
-            SupervisorFile.write("\n")
-
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > int(self.__Constant.APIC_Number):
-                    for k in range (0 , len( self.__Supervisor_List[i].getSupervisorList())): 
-                        SupervisorFile.write("Supervisor, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__Supervisor_List[i].getSupervisor_ID(k), self.__Supervisor_List[i].getDescription(k), self.__Supervisor_List[i].getOperational_Status(k), self.__Supervisor_List[i].getPowerStatus(k), self.__Supervisor_List[i].getSerial_Number(k), self.__Supervisor_List[i].getVendor(k), self.__Supervisor_List[i].getModel(k), self.__Supervisor_List[i].getHardwareVersion(k), self.__Supervisor_List[i].getUpTime(k)))
-                        SupervisorFile.write("\n")
-            
-            SupervisorFile.close()
-
-        #We create the CSV Line Card File
-        #If the File exist we override the file
-        try:
-            LINE_CARD_File = open( LINE_CARD_Filename, "x")
-            LINE_CARD_File.write("Component, Node ID, Line Card ID, Description, Hardware Version, Model, Operational Status, Power Status, Serial Number, Vendor, UP Time")
-            LINE_CARD_File.write("\n")
-
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
-                    for k in range (0, len( self.__LineCards_List[i].getLineCardList())):
-                        LINE_CARD_File.write("Line Card, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__LineCards_List[i].getID(k), self.__LineCards_List[i].getDescription(k), self.__LineCards_List[i].getHardwareVersion(k), self.__LineCards_List[i].getModel(k), self.__LineCards_List[i].getOperationalStatus(k), self.__LineCards_List[i].getPowerStatus(k), self.__LineCards_List[i].getSerialNumber(k), self.__LineCards_List[i].getVendor(k), self.__LineCards_List[i].getUpTime(k)))
-                        LINE_CARD_File.write("\n")
-
-            LINE_CARD_File.close()
-        except:
-            LINE_CARD_File = open( LINE_CARD_Filename, "w")
-            LINE_CARD_File.write("Component, Node ID, Line Card ID, Description, Hardware Version, Model, Operational Status, Power Status, Serial Number, Vendor, UP Time")
-            LINE_CARD_File.write("\n")
-
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
-                    for k in range (0, len( self.__LineCards_List[i].getLineCardList())):
-                        LINE_CARD_File.write("Line Card, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__LineCards_List[i].getID(k), self.__LineCards_List[i].getDescription(k), self.__LineCards_List[i].getHardwareVersion(k), self.__LineCards_List[i].getModel(k), self.__LineCards_List[i].getOperationalStatus(k), self.__LineCards_List[i].getPowerStatus(k), self.__LineCards_List[i].getSerialNumber(k), self.__LineCards_List[i].getVendor(k), self.__LineCards_List[i].getUpTime(k)))
-                        LINE_CARD_File.write("\n")
-
-            LINE_CARD_File.close()
-
-        #We create the CSV Power Supply File
-        #If the File exist we override the file
-        try:
-            POWER_SUPPLY_Filename = open( POWER_SUPPLY_Filename, "x")
-            POWER_SUPPLY_Filename.write("Component, Node ID, Power Supply ID, Description, Model, Serial Number, Vendor, Fan Operational Status, Hardware Version")
-            POWER_SUPPLY_Filename.write("\n")
-
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
-                    for k in range (0 , len( self.__PowerSupply_List[i].getFanList())):
-                        POWER_SUPPLY_Filename.write("Power Supply, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__PowerSupply_List[i].getPowerSupplyID(k), self.__PowerSupply_List[i].getPowerSupplyDescription(k), self.__PowerSupply_List[i].getPowerSupplyModel(k), self.__PowerSupply_List[i].getPowerSupplySerialNumber(k), self.__PowerSupply_List[i].getPowerSupplyVendor(k), self.__PowerSupply_List[i].getPowerSupplyOperationalStatus(k), self.__PowerSupply_List[i].getHardwareVersion(k)))
-                        POWER_SUPPLY_Filename.write("\n")
-
-            POWER_SUPPLY_Filename.close()
-        except:
-            POWER_SUPPLY_Filename = open( POWER_SUPPLY_Filename, "w")
-            POWER_SUPPLY_Filename.write("Component, Node ID, Power Supply ID, Description, Model, Serial Number, Vendor, Fan Operational Status, Hardware Version")
-            POWER_SUPPLY_Filename.write("\n")
-            
-            for i in range ( 0, len(self.__Node_ID_List )):
-                if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
-                    for k in range (0 , len( self.__PowerSupply_List[i].getFanList())):
-                        POWER_SUPPLY_Filename.write("Power Supply, %s, %s, %s, %s, %s, %s, %s, %s" % (self.__Node_ID_List[i], self.__PowerSupply_List[i].getPowerSupplyID(k), self.__PowerSupply_List[i].getPowerSupplyDescription(k), self.__PowerSupply_List[i].getPowerSupplyModel(k), self.__PowerSupply_List[i].getPowerSupplySerialNumber(k), self.__PowerSupply_List[i].getPowerSupplyVendor(k), self.__PowerSupply_List[i].getPowerSupplyOperationalStatus(k), self.__PowerSupply_List[i].getHardwareVersion(k)))
-                        POWER_SUPPLY_Filename.write("\n")
-
-            POWER_SUPPLY_Filename.close()
-
     #Export ACI Inventory in JSON Format
     def ExportInventoryJsonFormat(self):
 
-        #Print the Information collected by the APICs
-        self.printAux()     
-        print("|                      Retriving data from APIC                        |")
-        self.printAux()
-
         #URL to obtain the Fabric Name
-        URL = "https://%s/api/node/mo/topology/pod-1/node-1.json?query-target=children&target-subtree-class=infraCont" % self.__Constant.apic
+        URL = self.__URLs['URLs']['Fabric_Name'] % self.__Constant.apic
 
         #Print The process of the Fabric Name
         print("|     Retriving Fabric Name: ", end = "\r")
 
         #Variable that store all the FANs information in JSON format
-        FABRIC_NAME = self.__get_request(URL)
+        self.__FabricName = self.__get_request(URL)
 
         #Json Format for all the Fabric Information
-        Fabric_Json = { "Fabric Name" : FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'],
+        Fabric_Json = { "Fabric Name" : self.__FabricName['imdata'][0]['infraCont']['attributes']['fbDmNm'],
                         "Total Nodes" : len(self.__Node_ID_List ), 
                         "data" : {
                                 "Chassis" : {
@@ -264,35 +203,21 @@ class Inventory:
                                     'UP Time' : "",
                                     "Supervisor" : {},
                                     "Power Supply" : {},
-                                    "Line Card" : {}
+                                    "Line Card" : {},
+                                    "System Controller" : {},
+                                    "Fabric Modules" : {}
                                 }
                         }
                     }
-        
-        #Print The process of the Fabric Name
-        print("|     Retriving Fabric Name: Complete                                  |")
 
         #Fabric List Based on number of nodes
         Fabric_Json['data']['Chassis'] = []
-
-        #Print The Numbers of Fabrics Nodes in the Fabric
-        print("|     Number of Fabric Nodes: %s                                       |" % len(self.__Node_ID_List))
 
         #Start Retrieving data
         self.printAux()
 
         #We create all the Chassis information into the Json variable
         for i in range ( 0, len(self.__Node_ID_List )):
-
-            #Variable for frame Size, in our Script value 72
-            FrameSize = len("|                      Retriving data from APIC                        |")
-
-            #Loading frame size
-            LoadingDataFrameSize = len("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Loading', 'red')))
-
-            #Retreving data from Fabrics Nodes 
-            print("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Loading', 'red')), '     ' ,' ' * (FrameSize - LoadingDataFrameSize), "|" , end="\r") 
-            time.sleep(1)
 
             Chassis = {
                     'Node ID'       :   self.__Node_ID_List[i],
@@ -307,17 +232,12 @@ class Inventory:
 
             Fabric_Json['data']['Chassis'].append(Chassis)
 
-            #we create the lists for Supervisors, Power Supplys and Lines Cards
+            #we create the lists for Supervisors, Power Supplys, Lines Cards, System Controllers & Fabric Modules
             Fabric_Json['data']['Chassis'][i]['Supervisor'] = []
             Fabric_Json['data']['Chassis'][i]['Power Supply'] = []
             Fabric_Json['data']['Chassis'][i]['Line Card'] = []
-
-            #Procesing frame size
-            ProcessingDataFrameSize = len("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Processing', 'yellow')))
-
-            #Start procesing Data
-            print("|     Retreving data from %s: %s" %(str(self.__Node_ID_List[i]), colored('Processing', 'yellow')), '     ' ,' ' * (FrameSize - ProcessingDataFrameSize), "|", end="\r")
-            time.sleep(1)
+            Fabric_Json['data']['Chassis'][i]['System Controller'] = []
+            Fabric_Json['data']['Chassis'][i]['Fabric Modules'] = []
 
             #If the Node is not a APIC we detect the Supervisor, Power Supply and Lines cards information
             if int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number:
@@ -350,7 +270,7 @@ class Inventory:
                     }
                     Fabric_Json['data']['Chassis'][i]['Power Supply'].append(PowerSupply)
                 
-                #We complete the Line Cards List into the Chassis ID i with the super visor information
+                #We complete the Line Cards List into the Chassis ID i with the supervisor information
                 for k in range (0, len( self.__LineCards_List[i].getLineCardList())):
                     LineCard = {
                         'ID' : self.__LineCards_List[i].getID(k),
@@ -364,46 +284,64 @@ class Inventory:
                         'UP_Time' : self.__LineCards_List[i].getUpTime(k),
                     }
                     Fabric_Json['data']['Chassis'][i]['Line Card'].append(LineCard)
-            
-            #Process completed from Node i
-            print("|     Retreving data from %s: %s  " %(str(self.__Node_ID_List[i]), colored('Complete', 'green')))
-            time.sleep(1)
+
+                #We complete the System Controller info into the Chassis ID i
+                for k in range (0, len(self.__SystemController_List[i].getSystemControllerList())):
+                    SystemControllerModule = {
+                        'Description' : self.__SystemController_List[i].getDescription(k),
+                        'Hardware Version' : self.__SystemController_List[i].getHardwareVersion(k),
+                        'System Controller ID' : self.__SystemController_List[i].getSystemControllerID(k),
+                        'Manufacturing Time' : self.__SystemController_List[i].getManufacturingTime(k),
+                        'Last time Object modified' : self.__SystemController_List[i].getLastTimeModified(k),
+                        'Model' : self.__SystemController_List[i].getModel(k),
+                        'Operational Status' : self.__SystemController_List[i].getOperationalStatus(k),
+                        'Power Status' : self.__SystemController_List[i].getPowerStatus(k),
+                        'System Controller HA Status' : self.__SystemController_List[i].getSystemController_HA_Status(k),
+                        'Serial Number' : self.__SystemController_List[i].getSerialNumber(k),
+                        'System Controller Uptime' : self.__SystemController_List[i].getSystemControllerUptime(k),
+                        'System Controller Vendor' : self.__SystemController_List[i].getVendor(k)
+                    }
+                    Fabric_Json['data']['Chassis'][i]['System Controller'].append(SystemControllerModule)
+
+                #We complete the Fabric Module info into the Chassis ID i
+                for k in range (0, len(self.__FabricModule_List[i].getFabricModuleList())):
+                    FabricModule = {
+                        'Description' : self.__FabricModule_List[i].getDescription(k),
+                        'Hardware Version' : self.__FabricModule_List[i].getHardwareVersion(k),
+                        'Fabric Module ID' : self.__FabricModule_List[i].getFabricModuleID(k),
+                        'Manufacturing Time' : self.__FabricModule_List[i].getManufacturingTime(k),
+                        'Last time Object modified' : self.__FabricModule_List[i].getLasttimemodified(k),
+                        'Model' : self.__FabricModule_List[i].getModel(k),
+                        'Operational Status' : self.__FabricModule_List[i].getOperationalStatus(k),
+                        'Power Status' : self.__FabricModule_List[i].getPowerStatus(k),
+                        'Fabric Module Status' : self.__FabricModule_List[i].getHA_Status(k),
+                        'Serial Number' : self.__FabricModule_List[i].getSerialNumber(k),
+                        'Type' : self.__FabricModule_List[i].getType(k),
+                        'Fabric Module Uptime' : self.__FabricModule_List[i].getFabricModuleUptime(k),
+                        'Vendor' : self.__FabricModule_List[i].getVendor(k)
+                    }
+                    Fabric_Json['data']['Chassis'][i]['Fabric Modules'].append(FabricModule)
+
 
         #We use the Date Class in order to know when the Output File was created
         today = date.today()
         
         #We create the Filename based on the APIC name and Date
-        Filename =  "Inventory" + "-" + FABRIC_NAME['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".json"
-
-        #Print Last 
-        self.printAux()
-
-        #Generating JSON File name Size
-        GenJsonFileSize = len("|     Generating JSON File: %s" % colored('Complete', 'green'))
-
-        #Filename Size
-        FilenameJsonFileSize = len("|     File Name: %s" %(Filename))
-
-        #Print JSON File Name
-        print("|     Generating JSON File: %s" % colored('Complete', 'green'), '     ' ,' ' * (FrameSize - GenJsonFileSize), "|")
-        print("|     File Name: %s" % colored(Filename, 'green'),' ' * (FrameSize - FilenameJsonFileSize - 3), "|")
-
-        #Print Last 
-        self.printAux()
+        Filename =  "Inventory" + "-" + self.__FabricName['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".json"
 
         #We create the JSON File
         #If the File exist we override the file
         try:
             OutputFile = open( Filename , "x" )
-            OutputFile.write(json.dumps(Fabric_Json, indent = 4))
-            OutputFile.close()
         except:
             OutputFile = open( Filename , "w" )
-            OutputFile.write(json.dumps(Fabric_Json, indent = 4))
-            OutputFile.close()
+
+        OutputFile.write(json.dumps(Fabric_Json, indent = 4))
+        OutputFile.close()
 
     #Print ACI Inventory method
     def printInventory(self):
+
         print("-----------------------------------------------")
         for i in range ( 0, len(self.__Node_ID_List )):
             
@@ -449,31 +387,106 @@ class Inventory:
 
     #Private Methods to construct the Node IDs Lists Attribute
     def __Fabric_Nodes(self):
-        #URL to get the Numbers of nodes in the Fabrics and its IDs
-        URL = "https://%s/api/node/class/fabricNode.json?&order-by=fabricNode.modTs|desc" % self.__Constant.apic
+
+        #Variable for frame Size, in our Script value 72
+        FrameSize = len("|                      Retriving data from APIC                        |")
+
+        #Print only if the verbose mode was enable
+        if self.__args.v:
+            
+            #Print the Information collected by the APICs
+            self.printAux()     
+            print("|                      Retriving data from APIC                        |")
+            self.printAux()
+
+        #Variable that store Fabric Name in the Fabric
+        FabricName = self.__get_request(self.__URLs['URLs']['Fabric_Name_Second_Option'] % self.__Constant.apic)
+
+        #Variable that store number of nodes in the Fabric
+        numNodes = self.__get_request(self.__URLs['URLs']['Num_Nodes_Plus_IDs'] % self.__Constant.apic)
 
         #Variable that store all the IDs information in JSON format
-        FABRIC_IDS = self.__get_request(URL)
+        FABRIC_IDS = self.__get_request(self.__URLs['URLs']['Num_Nodes_Plus_IDs'] % self.__Constant.apic)
+
+        #Print only if the verbose mode was enable
+        if self.__args.v:
+            #Print The process of the Fabric Name
+            Name_Index = len("|     Retriving Fabric Name: %s" % colored(FabricName['imdata'][0]['infraCont']['attributes']['fbDmNm'],'green'))
+
+            print("|     Retriving Fabric Name: %s" % colored(FabricName['imdata'][0]['infraCont']['attributes']['fbDmNm'],'green') + ' ' * ((FrameSize - Name_Index) + 7), "|")
+
+            #Cheking the difference between the output and free space
+            index_aux = len("|     Number of Nodes in the Fabric: %s" + numNodes['totalCount'])
+
+            #Printing the total devices in the Fabric
+            print("|     Number of Nodes in the Fabric: %s" % colored(numNodes['totalCount'], 'green') + ' ' * (FrameSize - index_aux), "|")
+
+            self.printAux()
 
         #Object creation with for loop
         for i in range( 0, int(FABRIC_IDS['totalCount'] )):
+
             #Build Node ID List with all Nodes ID in the fabric
             self.__Node_ID_List.append( FABRIC_IDS['imdata'][i]['fabricNode']['attributes']['id'] )
-            
+
             #Build Chassis List with all the information about Node Chassis
-            self.__Chassis_List.append( ChassisClass ( self.__Constant.apic , self.__Chassis_Query , self.__Node_ID_List[i] ))
+            self.__Chassis_List.append( ChassisClass ( self.__Constant.apic , self.__Chassis_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['Chassis'] ))
+
+            #Print only if the verbose mode was enable
+            if self.__args.v:
+                    self.__print_Node_Info("Retriving", self.__Node_ID_List[i], self.__Chassis_List[i].getRole(), FrameSize, True, "red")
 
             #Build Supervisor List with the information about the supervisors
             if(int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number):
-                self.__Supervisor_List.append( SupervisorClass ( self.__Constant.apic , self.__Supervisor_Query , self.__Node_ID_List[i] ))
+                self.__Supervisor_List.append( SupervisorClass ( self.__Constant.apic , self.__Supervisor_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['Supervisor'] ))
             else:
                 self.__Supervisor_List.append(0)
 
+            #Print only if the verbose mode was enable
+            if self.__args.v:
+                    self.__print_Node_Info("Processing", self.__Node_ID_List[i], self.__Chassis_List[i].getRole(), FrameSize, True, "yellow")
+
             #Build LineCard List with the information about the Line Cards
             if(int(self.__Node_ID_List[i]) > self.__Constant.APIC_Number):
-                self.__LineCards_List.append( LinesCardModule ( self.__Constant.apic , self.__LineCards_Query , self.__Node_ID_List[i] ))
+                self.__LineCards_List.append( LinesCardModule ( self.__Constant.apic , self.__LineCards_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['Linecards'] ))
             else:
                 self.__LineCards_List.append(0)
 
             #Build Power Supply Lists with the information about Power Supply Node
-            self.__PowerSupply_List.append( PowerSupplyUnitsClass ( self.__Constant.apic , self.__PowerSupply_Query , self.__Node_ID_List[i] ))
+            self.__PowerSupply_List.append( PowerSupplyUnitsClass ( self.__Constant.apic , self.__PowerSupply_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['Power_Supply'] ))
+
+            #Build System Controller Lists
+            self.__SystemController_List.append(SystemControllerModule (self.__Constant.apic , self.__SystemController_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['System_Controller']))
+
+            #Build Fabric Module List
+            self.__FabricModule_List.append(FabricModuleControllers (self.__Constant.apic , self.__FabricModule_Query , self.__Node_ID_List[i] , self.__URLs['URLs']['Fabric_Module']))
+
+            #Print only if the verbose mode was enable
+            #This part show the completed process
+            if self.__args.v:
+                    self.__print_Node_Info("Completed", self.__Node_ID_List[i], self.__Chassis_List[i].getRole(), FrameSize, False, "green")
+
+        #Print only if the verbose mode was enable
+        if self.__args.v:
+
+            #We use the Date Class in order to know when the Output File was created
+            today = date.today()
+        
+            #We create the Filename based on the APIC name and Date
+            Filename =  "Inventory" + "-" + FabricName['imdata'][0]['infraCont']['attributes']['fbDmNm'] + "-" + today.strftime("%d-%m-%Y") + ".json"
+
+            #Print Last 
+            self.printAux()
+
+            #Filename Size
+            FilenameJsonFileSize = len("|     File Name: %s" % Filename)
+
+            #Print Last 
+            self.printAux()
+
+            #Generating JSON File name Size
+            GenJsonFileSize = len("|     Generating JSON File: %s" % colored('Complete', 'green'))
+
+            #Print JSON File Name
+            print("|     Generating JSON File: %s" % colored('Complete', 'green'), '     ' ,' ' * (FrameSize - GenJsonFileSize), "|")
+            print("|     File Name: %s" % colored(Filename, 'green'),' ' * (FrameSize - FilenameJsonFileSize - 3), "|")

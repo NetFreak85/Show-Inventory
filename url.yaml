@@ -1,0 +1,46 @@
+#File that will store all the URL required by the program to retrieve information from the APICs
+
+#ACI Componets for if checks
+Components:
+
+    #Switch Spine Model
+    Spine: "spine"
+
+    #Switch Leaf Model
+    Leaf: "leaf"
+
+    #Cisco Application Policy Infrastructure Controller (APIC)
+    Controller: "controller"
+
+#URLs for the RESTConf Querys
+URLs:
+
+    #url for token generation
+    Token: https://%s/api/mo/aaaLogin.xml
+
+    #URL to get the Numbers of nodes in the Fabrics and its IDs
+    Num_Nodes_Plus_IDs: https://%s/api/node/class/fabricNode.json?&order-by=fabricNode.modTs|desc
+
+    #URL to obtain the Fabric Name
+    Fabric_Name: https://%s/api/node/mo/topology/pod-1/node-1.json?query-target=children&target-subtree-class=infraCont
+
+    #URL to retrieve fabric name
+    Fabric_Name_Second_Option: https://%s/api/node/class/infraCont.json?&order-by=infraCont.modTs|desc
+
+    #URL that will provide all the information about the Chasis
+    Chassis: https://%s/api/node/mo/topology/pod-1/node-%s/sys/ch.json
+
+    #URL that will provide all the information about the Supervisors
+    Supervisor: https://%s/api/node/mo/topology/pod-1/node-%s.json?query-target=subtree&target-subtree-class=eqptSupC
+
+    #URL that will provide all the information about the Line Cards
+    Linecards: https://%s/api/node/mo/topology/pod-1/node-%s.json?query-target=subtree&target-subtree-class=eqptLC
+
+    #URL that will provide all the information about the Power Supply Units
+    Power_Supply: https://%s/api/node/mo/topology/pod-1/node-%s/sys/ch.json?query-target=subtree&target-subtree-class=eqptPsu
+
+    #URL that will provide all the information about the System Controller
+    System_Controller: https://%s/api/node/mo/topology/pod-1/node-%s/sys/ch/scslot-%s/sc.json?query-target=self
+
+    #URL that will provide all the information about the Fabrics Modules
+    Fabric_Module: https://%s/api/node/mo/topology/pod-1/node-%s.json?query-target=subtree&target-subtree-class=eqptFC

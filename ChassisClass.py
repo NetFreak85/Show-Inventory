@@ -8,7 +8,6 @@
 
 import requests
 import json
-import time
 
 #####################
 # Class Declaration #
@@ -16,10 +15,11 @@ import time
 
 class ChassisClass:
 
-    def __init__(self, ACI_IP, ACI_Cookie, Node_ID):
+    def __init__(self, ACI_IP, ACI_Cookie, Node_ID, Chassis_URL):
         self.__ACI_IP_ADDR = ACI_IP
         self.__ACI_Cookie = ACI_Cookie
         self.__Node_ID = Node_ID
+        self.__URL = Chassis_URL
         self.__description = ""
         self.__ID = ""
         self.__Model = ""
@@ -67,6 +67,9 @@ class ChassisClass:
     #Chassis Vendor
     __Vendor = ""
 
+    #URL that will query for the Chassis information from Cisco APIC
+    __URL = ""
+
     ###############
     # Get Methods #
     ###############
@@ -108,26 +111,29 @@ class ChassisClass:
     ##########################################################
     
     def __get_request(self, url):
-	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
-	    json_obj = json.loads(responds.content)
-	    return json_obj
-    
+        responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
+        json_obj = json.loads(responds.content)
+        return json_obj
+
     ###############################
     # Get Supervisors Information #
     ###############################
 
     def __getSupervisorInfo(self):
-        #URL that will provide all the information about the Chasis
-        URL = "https://%s/api/node/mo/topology/pod-1/node-%s/sys/ch.json" % (self.__ACI_IP_ADDR, self.__Node_ID)
 
         #Variable that store all the FANs information in JSON format
-        CHASSIS_INFO = self.__get_request(URL)
+        CHASSIS_INFO = self.__get_request(self.__URL % (self.__ACI_IP_ADDR, self.__Node_ID))
 
         #Copy values to Class attributes from JSON output
         self.__description = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['descr']
         self.__ID = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['id']
         self.__Model = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['model']
-        self.__Role = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['role']
+
+        if str(CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['role']) == "8":
+            self.__Role = "APIC"
+        else:
+            self.__Role = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['role']
+        
         self.__OperationalStatus = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['operSt']
         self.__SerialNumber = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['ser']
         self.__Status = CHASSIS_INFO['imdata'][0]['eqptCh']['attributes']['operStQual']

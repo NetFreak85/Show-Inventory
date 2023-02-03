@@ -16,10 +16,11 @@ from Supervisor import Supervisor
 
 class SupervisorClass:
 
-    def __init__(self, ACI_IP, ACI_Cookie, Node_ID):
+    def __init__(self, ACI_IP, ACI_Cookie, Node_ID, Supervisor_URL):
         self.__ACI_IP_ADDR = ACI_IP
         self.__ACI_Cookie = ACI_Cookie
         self.__Node_ID = Node_ID
+        self.__URL = Supervisor_URL
         self.__Internal_Supervisor_List = []
         self.__getSupervisorInfo()
     
@@ -35,6 +36,9 @@ class SupervisorClass:
 
     #ACI Node ID
     __Node_ID = ""
+
+    #URL that will query for the Supervisor information from Cisco APIC
+    __URL = ""
 
     #Supervisor List
     __Internal_Supervisor_List = []
@@ -93,20 +97,18 @@ class SupervisorClass:
     ##########################################################
     
     def __get_request(self, url):
-	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
-	    json_obj = json.loads(responds.content)
-	    return json_obj
+        responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
+        json_obj = json.loads(responds.content)
+        return json_obj
 
     ###############################
     # Get Supervisors Information #
     ###############################
 
     def __getSupervisorInfo(self):
-        #URL that will provide all the information about the FANs
-        URL = "https://%s/api/node/mo/topology/pod-1/node-%s.json?query-target=subtree&target-subtree-class=eqptSupC" % (self.__ACI_IP_ADDR, self.__Node_ID)
 
-        #Variable that store all the FANs information in JSON format
-        SUPERVISOR_INFO = self.__get_request(URL)
+        #Variable that store all the Supervisors information in JSON format
+        SUPERVISOR_INFO = self.__get_request(self.__URL % (self.__ACI_IP_ADDR, self.__Node_ID))
 
         #Object creation with for loop
         for i in range(0,int(SUPERVISOR_INFO['totalCount'])):

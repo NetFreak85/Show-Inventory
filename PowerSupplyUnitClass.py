@@ -16,10 +16,11 @@ from PowerSupply import PowerSupply
 
 class PowerSupplyUnitsClass:
 
-    def __init__(self, ACI_IP, ACI_Cookie, Node_ID):
+    def __init__(self, ACI_IP, ACI_Cookie, Node_ID, PowerSupply_URL):
         self.__ACI_IP_ADDR = ACI_IP
         self.__ACI_Cookie = ACI_Cookie
         self.__Node_ID = Node_ID
+        self.__URL = PowerSupply_URL
         self.__Internal_Fan_List = []
         self.__getPowerSupplyInfo()
 
@@ -35,6 +36,9 @@ class PowerSupplyUnitsClass:
 
     #ACI Node ID
     __Node_ID = ""
+
+    #URL that will query for the Power Supply information from Cisco APIC
+    __URL = ""
 
     #List that will store all FAN Info in Objects
     __Internal_Fan_List = []
@@ -100,21 +104,18 @@ class PowerSupplyUnitsClass:
     ##########################################################
 
     def __get_request(self, url):
-	    responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
-	    json_obj = json.loads(responds.content)
-	    return json_obj
+        responds = requests.get(url, cookies=self.__ACI_Cookie, verify=False)
+        json_obj = json.loads(responds.content)
+        return json_obj
 
     ######################################
     # Get Power Supply Units Information #
     ######################################
 
     def __getPowerSupplyInfo(self):
-        
-        #URL that will provide all the information about the FANs
-        URL = "https://%s/api/node/mo/topology/pod-1/node-%s/sys/ch.json?query-target=subtree&target-subtree-class=eqptPsu" % (self.__ACI_IP_ADDR, self.__Node_ID)
 
-        #Variable that store all the FANs information in JSON format
-        FAN_INFO = self.__get_request(URL)
+        #Variable that store all the Power Supply Units information in JSON format
+        FAN_INFO = self.__get_request(self.__URL % (self.__ACI_IP_ADDR, self.__Node_ID))
 
         #Object creation with for loop
         for i in range(0,int(FAN_INFO['totalCount'])):
