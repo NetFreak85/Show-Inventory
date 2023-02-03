@@ -1,3 +1,3 @@
 # ShowInventory
 
-Show the Cisco ACI Inventory in 3 ways (via Command line interface, JSON File or CSV file)
+Script that will export a Json file with all the Serial Numbers in the Fabric
