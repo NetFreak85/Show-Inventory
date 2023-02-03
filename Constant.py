@@ -2,17 +2,17 @@
 # coding=utf-8
 
 #Cisco ACI User
-User = "admin"
+User = ""
 
 #Cisco ACI Password
-Password = "m3rc4r10."
+Password = ""
 
 #Cisco ACI IP Address or DNS name
-apic = "nas1pxx03l.es.nextgen.igrupobbva"
+apic = ""
 
-apic_2 = "nas1pxx02l.es.nextgen.igrupobbva"
+apic_2 = ""
 
-apic_3 = "nas1pxx01l.es.nextgen.igrupobbva"
+apic_3 = ""
 
 #Number of APICs
 APIC_Number = 3
